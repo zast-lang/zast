@@ -9,7 +9,7 @@
 /// Operators   Plus, Minus, Multiply, Divide
 /// Keywords    Var
 /// ```
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum TokenKind {
     /// A character or sequence that does not match any known lexeme.
     Illegal,
@@ -18,16 +18,16 @@ pub enum TokenKind {
     Eof,
 
     /// A string literal, e.g. `"hello"`. The inner value excludes the quotes.
-    String(String),
+    String,
 
     /// A user-defined name, e.g. `foo`, `_bar`, `myVar`.
-    Identifier(String),
+    Identifier,
 
-    /// A 32-bit signed integer literal, e.g. `42`.
-    Integer(i32),
+    /// A 64-bit signed integer literal, e.g. `42`.
+    Integer,
 
     /// A 64-bit floating-point literal, e.g. `3.14`.
-    Float(f64),
+    Float,
 
     /// `;`
     Semicolon,
@@ -50,8 +50,52 @@ pub enum TokenKind {
     /// `/`
     Divide,
 
+    /// `(`
+    LeftParenthesis,
+
+    /// `)`
+    RightParenthesis,
+
     /// `var` keyword — introduces a variable declaration.
     Var,
+}
+
+#[derive(Debug)]
+pub enum Literal {
+    StringValue(String),
+    IntegerValue(i64),
+    Identifier(String),
+    FloatValue(f64),
+    String(String),
+    None,
+}
+
+impl Literal {
+    pub fn from(token_kind: &TokenKind, literal: String) -> Self {
+        match token_kind {
+            TokenKind::String => Literal::StringValue(literal),
+            TokenKind::Identifier => Literal::Identifier(literal),
+            TokenKind::Integer => Literal::IntegerValue(literal.parse().unwrap()),
+            TokenKind::Float => Literal::FloatValue(literal.parse().unwrap()),
+            _ => Literal::String(literal),
+        }
+    }
+}
+
+impl TokenKind {
+    pub fn is_delimiter(&self) -> bool {
+        match self {
+            Self::Semicolon => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_literal_value(&self) -> bool {
+        match self {
+            Self::Identifier | Self::Integer | Self::String | Self::Float => true,
+            _ => false,
+        }
+    }
 }
 
 /// A single lexeme produced by the lexer, carrying its kind, raw source text,
@@ -59,7 +103,9 @@ pub enum TokenKind {
 #[derive(Debug)]
 pub struct Token {
     /// The raw source text of the token, exactly as it appeared in the input.
-    pub literal: String,
+    pub literal: Literal,
+
+    pub lexeme: String,
 
     /// The source location of this token.
     pub span: Span,
@@ -81,11 +127,12 @@ impl Token {
     pub fn from_keyword(keyword: &str, span: Span) -> Self {
         let token_kind = match keyword {
             "var" => TokenKind::Var,
-            _ => TokenKind::Identifier(keyword.to_string()),
+            _ => TokenKind::Identifier,
         };
 
         Self {
-            literal: keyword.to_string(),
+            literal: Literal::None,
+            lexeme: keyword.to_string(),
             span,
             kind: token_kind,
         }
@@ -96,7 +143,8 @@ impl Default for Token {
     /// Returns an EOF token with an empty literal and a zeroed span.
     fn default() -> Self {
         Self {
-            literal: String::new(),
+            literal: Literal::None,
+            lexeme: String::new(),
             span: Span::default(),
             kind: TokenKind::Eof,
         }

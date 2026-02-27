@@ -1,4 +1,4 @@
-use zast::lexer::tokenizer::ZastLexer;
+use zast::lexer::ZastLexer;
 
 fn main() {
     let src = r#"

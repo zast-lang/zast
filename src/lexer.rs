@@ -1,4 +1,6 @@
-use crate::lexer::tokens::{Span, Token, TokenKind};
+pub mod tokens;
+
+use crate::lexer::tokens::{Literal, Span, Token, TokenKind};
 use std::mem;
 
 /// A lexer for the Zast language.
@@ -72,8 +74,9 @@ impl ZastLexer {
     /// * `toks` - The token sequence to display, typically from [`ZastLexer::tokenize`].
     pub fn debug_tokens(&self, toks: Vec<Token>) {
         for t in toks {
-            println!("TokenLiteral: {:?}", t.literal);
+            println!("TokenLexeme: {:?}", t.lexeme);
             println!("TokenKind: {:?}", t.kind);
+            println!("TokenLiteral: {:?}", t.literal);
             println!(
                 "TokenSpan: {}:{}–{}:{}",
                 t.span.ln_start, t.span.col_start, t.span.ln_end, t.span.col_end
@@ -214,8 +217,9 @@ impl ZastLexer {
             let num = num_lit.parse::<f64>().unwrap();
 
             Token {
-                literal: num_lit.clone(),
-                kind: TokenKind::Float(num),
+                literal: Literal::FloatValue(num),
+                lexeme: num_lit,
+                kind: TokenKind::Float,
                 span: self.get_span(col_start, col_end, ln_start, ln_end),
             }
         } else {
@@ -224,11 +228,12 @@ impl ZastLexer {
             let src_end = self.current_source_pos;
 
             let num_lit: String = self.source[src_start..src_end].iter().collect();
-            let num = num_lit.parse::<i32>().unwrap();
+            let num = num_lit.parse::<i64>().unwrap();
 
             Token {
-                literal: num_lit.clone(),
-                kind: TokenKind::Integer(num),
+                literal: Literal::IntegerValue(num),
+                lexeme: num_lit,
+                kind: TokenKind::Integer,
                 span: self.get_span(col_start, col_end, ln_start, ln_end),
             }
         }
@@ -318,7 +323,7 @@ impl ZastLexer {
     /// Constructs a single-character [`Token`] at the current source position.
     ///
     /// The span covers exactly the current column on the current line.
-    fn new_token(&self, token_kind: TokenKind, literal: String) -> Token {
+    fn new_token(&self, token_kind: TokenKind, lexeme: String) -> Token {
         let span = self.get_span(
             self.current_column,
             self.current_column,
@@ -327,7 +332,8 @@ impl ZastLexer {
         );
 
         Token {
-            literal,
+            literal: Literal::None,
+            lexeme,
             kind: token_kind,
             span,
         }
