@@ -1,6 +1,9 @@
 pub mod tokens;
 
-use crate::lexer::tokens::{Literal, Span, Token, TokenKind};
+use crate::{
+    error_handler::{ZastErrorCollector, zast_errors::ZastError},
+    lexer::tokens::{Literal, Span, Token, TokenKind},
+};
 use std::mem;
 
 /// A lexer for the Zast language.
@@ -29,7 +32,7 @@ pub struct ZastLexer {
     source: Vec<char>,
 
     /// Accumulated lexical errors encountered during tokenization.
-    errors: Vec<String>,
+    errors: ZastErrorCollector,
 
     /// The token stream produced so far.
     tokens: Vec<Token>,
@@ -56,7 +59,7 @@ impl ZastLexer {
     pub fn new(src: &str) -> Self {
         Self {
             source: src.chars().collect(),
-            errors: Vec::new(),
+            errors: ZastErrorCollector::new(),
             tokens: Vec::new(),
             current_source_pos: 0,
             current_line: 1,
@@ -96,7 +99,7 @@ impl ZastLexer {
     /// - `Ok(Vec<Token>)` if no errors were encountered.
     /// - `Err(Vec<String>)` containing all accumulated error messages if any
     ///   illegal characters were encountered.
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, Vec<String>> {
+    pub fn tokenize(&mut self) -> Result<Vec<Token>, ZastErrorCollector> {
         while !self.is_at_end() {
             self.skip_whitespaces();
 
@@ -108,10 +111,10 @@ impl ZastLexer {
         self.tokens
             .push(self.new_token(TokenKind::Eof, String::from("END_OF_FILE")));
 
-        if self.errors.is_empty() {
-            Ok(mem::take(&mut self.tokens))
-        } else {
+        if self.errors.has_errors() {
             Err(mem::take(&mut self.errors))
+        } else {
+            Ok(mem::take(&mut self.tokens))
         }
     }
 
@@ -140,7 +143,19 @@ impl ZastLexer {
             '-' => self.new_token(TokenKind::Minus, strc),
             '*' => self.new_token(TokenKind::Multiply, strc),
             '/' => self.new_token(TokenKind::Divide, strc),
-            _ => self.new_token(TokenKind::Illegal, strc),
+            _ => {
+                self.throw_error(ZastError::IllegalToken {
+                    span: self.get_span(
+                        self.current_column - 1,
+                        self.current_column,
+                        self.current_line,
+                        self.current_line,
+                    ),
+                    token_lexeme: strc.clone(),
+                });
+
+                self.new_token(TokenKind::Illegal, strc)
+            }
         };
 
         self.advance();
@@ -237,6 +252,11 @@ impl ZastLexer {
                 span: self.get_span(col_start, col_end, ln_start, ln_end),
             }
         }
+    }
+
+    /// Pushes the error to the `ZastErrorCollector`
+    fn throw_error(&mut self, error: ZastError) {
+        self.errors.add_error(error);
     }
 
     /// Advances past any whitespace characters, updating line and column state.

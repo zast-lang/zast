@@ -2,7 +2,7 @@ use zast::lexer::ZastLexer;
 
 fn main() {
     let src = r#"
-    10*12
+    #
 "#;
     let mut lexer = ZastLexer::new(src);
     match lexer.tokenize() {
@@ -10,9 +10,7 @@ fn main() {
             lexer.debug_tokens(toks);
         }
         Err(err) => {
-            for e in err {
-                println!("Error: {e}");
-            }
+            err.report_all_errors();
         }
     };
 }

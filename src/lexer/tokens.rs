@@ -60,12 +60,12 @@ pub enum TokenKind {
     Var,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     StringValue(String),
     IntegerValue(i64),
-    Identifier(String),
     FloatValue(f64),
+    Identifier(String),
     String(String),
     None,
 }
@@ -78,6 +78,31 @@ impl Literal {
             TokenKind::Integer => Literal::IntegerValue(literal.parse().unwrap()),
             TokenKind::Float => Literal::FloatValue(literal.parse().unwrap()),
             _ => Literal::String(literal),
+        }
+    }
+
+    pub fn get_string(&self) -> Option<String> {
+        match self {
+            Self::StringValue(v) => Some(v.clone()),
+            _ => None,
+        }
+    }
+    pub fn get_int(&self) -> Option<i64> {
+        match self {
+            Self::IntegerValue(v) => Some(*v),
+            _ => None,
+        }
+    }
+    pub fn get_float(&self) -> Option<f64> {
+        match self {
+            Self::FloatValue(v) => Some(*v),
+            _ => None,
+        }
+    }
+    pub fn get_identifier(&self) -> Option<String> {
+        match self {
+            Self::Identifier(v) => Some(v.clone()),
+            _ => None,
         }
     }
 }
@@ -156,7 +181,7 @@ impl Default for Token {
 ///
 /// Both lines and columns are 1-based. A single-character token on line 3,
 /// column 7 would have `ln_start = ln_end = 3` and `col_start = col_end = 7`.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Span {
     /// 1-based column of the first character of the token.
     pub col_start: usize,

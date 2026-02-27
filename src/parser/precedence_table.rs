@@ -1,5 +1,9 @@
+use num_enum::IntoPrimitive;
+
 use crate::lexer::tokens::TokenKind;
 
+#[derive(IntoPrimitive)]
+#[repr(u8)]
 pub enum Precedence {
     Default,
     Assignment,

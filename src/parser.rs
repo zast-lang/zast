@@ -3,7 +3,8 @@ pub mod precedence_table;
 use std::{collections::HashMap, mem};
 
 use crate::{
-    ast::{Expression, Statement, ZastProgram},
+    ast::{Expr, Expression, Statement, Stmt, ZastProgram},
+    error_handler::{ZastErrorCollector, zast_errors::ZastError},
     lexer::tokens::{Token, TokenKind},
     parser::precedence_table::Precedence,
 };
@@ -15,7 +16,7 @@ type StmtParseFn = fn(&mut ZastParser) -> Option<Statement>;
 pub struct ZastParser {
     tokens: Vec<Token>,
     current_token_ptr: usize,
-    errors: Vec<String>,
+    errors: ZastErrorCollector,
 
     nud_lookup: HashMap<TokenKind, NUDParseFn>,
     led_lookup: HashMap<TokenKind, LEDParseFn>,
@@ -24,16 +25,17 @@ pub struct ZastParser {
 
 impl ZastParser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        let parser = Self {
+        let mut parser = Self {
             tokens,
             current_token_ptr: 0,
-            errors: Vec::new(),
+            errors: ZastErrorCollector::new(),
 
             nud_lookup: HashMap::new(),
             led_lookup: HashMap::new(),
             stmt_lookup: HashMap::new(),
         };
 
+        parser.register_nud(TokenKind::Integer, ZastParser::parse_integer_literal);
         parser
     }
 
@@ -47,7 +49,7 @@ impl ZastParser {
         self.stmt_lookup.insert(token_kind, stmt_fn);
     }
 
-    pub fn parse_program(&mut self) -> Result<ZastProgram, Vec<String>> {
+    pub fn parse_program(&mut self) -> Result<ZastProgram, ZastErrorCollector> {
         let mut body = Vec::new();
         while !self.is_at_eof() {
             let node = self.try_parse_stmt();
@@ -59,10 +61,10 @@ impl ZastParser {
             body.push(node.unwrap());
         }
 
-        if self.errors.is_empty() {
-            Ok(self.finish(body))
-        } else {
+        if self.errors.has_errors() {
             Err(mem::take(&mut self.errors))
+        } else {
+            Ok(self.finish(body))
         }
     }
 
@@ -70,8 +72,8 @@ impl ZastParser {
         ZastProgram { body }
     }
 
-    fn throw_error(&mut self, err_msg: String) {
-        self.errors.push(err_msg);
+    fn throw_error(&mut self, err: ZastError) {
+        self.errors.add_error(err);
     }
 
     fn sync_tokens(&mut self) {
@@ -98,12 +100,16 @@ impl ZastParser {
         self.current_token().kind
     }
 
-    fn advance(&mut self) {
-        self.current_token_ptr += 1;
+    fn current_token_precedence(&self) -> u8 {
+        Precedence::get_precedence(self.current_token_kind()).into()
     }
 
     fn next_token_precedence(&self) -> u8 {
         Precedence::get_precedence(self.peek_token_kind()).into()
+    }
+
+    fn advance(&mut self) {
+        self.current_token_ptr += 1;
     }
 
     fn is_at_eof(&self) -> bool {
@@ -121,28 +127,58 @@ impl ZastParser {
     }
     // ---------- Statements ----------
     pub fn try_parse_stmt(&mut self) -> Option<Statement> {
-        // let stmt_expr = self.try_parse_expr()?;
-        None
+        if let Some(stmt_fn) = self.stmt_lookup.get(&self.current_token_kind()) {
+            return stmt_fn(self);
+        }
+
+        let stmt_expr = self.try_parse_expr(Precedence::Default)?;
+        let stmt_expr_span = stmt_expr.span;
+        let stmt = Stmt::Expression {
+            expression: stmt_expr,
+        };
+
+        Some(stmt.spanned(stmt_expr_span))
     }
     // ---------- Expressions ----------
-    pub fn try_parse_expr(&mut self, precedence: u8) -> Option<Expression> {
-        if let Some(left_fn) = self.nud_lookup.get(&self.current_token_kind()) {
+    pub fn try_parse_expr(&mut self, precedence: Precedence) -> Option<Expression> {
+        let current_tok = self.current_token();
+        let prec: u8 = precedence.into();
+
+        let nud_fn = self.nud_lookup.get(&current_tok.kind).cloned();
+
+        if let Some(left_fn) = nud_fn {
             let mut left = left_fn(self)?;
 
-            while precedence < self.next_token_precedence() && !self.is_at_eof() {
-                if let Some(right_fn) = self.led_lookup.get(&self.current_token_kind()) {
-                    left = right_fn(self, left_fn);
+            while !self.is_at_eof() {
+                let next_prec = self.current_token_precedence();
+                if prec >= next_prec {
+                    break;
                 }
-                break;
+
+                let led_fn = self.led_lookup.get(&self.current_token_kind());
+                if let Some(right_fn) = led_fn {
+                    left = right_fn(self, left)?;
+                } else {
+                    break;
+                }
             }
 
             return Some(left);
         }
 
-        self.throw_error(format!(
-            "Unexpected '{:?}' token",
-            self.current_token_kind()
-        ));
-        return None;
+        self.throw_error(ZastError::UnexpectedToken {
+            span: current_tok.span,
+            token_kind: current_tok.kind,
+        });
+        None
+    }
+
+    pub fn parse_integer_literal(&mut self) -> Option<Expression> {
+        let current_tok_span = self.current_token().span;
+        let current_tok_literal = self.current_token().literal.clone();
+        let expr = Expr::IntegerLiteral(current_tok_literal.get_int().unwrap());
+
+        self.advance();
+        Some(expr.spanned(current_tok_span))
     }
 }
