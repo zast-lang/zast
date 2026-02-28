@@ -1,4 +1,4 @@
-use crate::lexer::tokens::Span;
+use crate::lexer::tokens::{Span, TokenKind};
 
 #[derive(Debug)]
 pub struct ZastProgram {
@@ -10,12 +10,26 @@ pub type Expression = Spanned<Expr>;
 pub enum Expr {
     IntegerLiteral(i64),
     FloatLiteral(f64),
+    Identifier(String),
+    BinaryExpression {
+        left: Box<Expression>,
+        operator: TokenKind,
+        right: Box<Expression>,
+    },
 }
 
 pub type Statement = Spanned<Stmt>;
 #[derive(Debug)]
 pub enum Stmt {
-    Expression { expression: Expression },
+    Expression {
+        expression: Expression,
+    },
+    VariableDeclaration {
+        mutable: bool,
+        identifier: String,
+        annotated_type: Expression,
+        value: Expression,
+    },
 }
 
 impl Stmt {

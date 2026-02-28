@@ -1,26 +1,34 @@
+use core::fmt;
+
 use crate::lexer::tokens::{Span, TokenKind};
 
 pub enum ZastError {
-    UnexpectedToken { span: Span, token_kind: TokenKind },
-    IllegalToken { span: Span, token_lexeme: String },
+    UnexpectedToken {
+        span: Span,
+        token_kind: TokenKind,
+    },
+    ExpectedToken {
+        span: Span,
+        expected_tokens: Vec<Expected>,
+        found_token: TokenKind,
+    },
+    IllegalToken {
+        span: Span,
+        token_lexeme: String,
+    },
 }
 
-impl ZastError {
-    pub fn get_span(&self) -> Span {
-        match self {
-            Self::UnexpectedToken { span, .. } => *span,
-            Self::IllegalToken { span, .. } => *span,
-        }
-    }
+#[derive(Debug)]
+pub enum Expected {
+    Token(TokenKind),
+    Concept(&'static str), // "type annotation", "expression"
+}
 
-    pub fn get_error_msg(&self) -> String {
+impl fmt::Display for Expected {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnexpectedToken { token_kind, .. } => {
-                format!("Unexpected token found '{:?}'", token_kind)
-            }
-            Self::IllegalToken { token_lexeme, .. } => {
-                format!("Illegal token found '{}'", token_lexeme)
-            }
+            Self::Token(kind) => write!(f, "'{:?}'", kind), // quoted
+            Self::Concept(s) => write!(f, "{}", s),         // unquoted
         }
     }
 }

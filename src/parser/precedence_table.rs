@@ -21,12 +21,12 @@ pub enum Precedence {
 }
 
 impl Precedence {
-    pub fn get_precedence(token_kind: TokenKind) -> Self {
+    pub fn get_precedence(token_kind: TokenKind) -> Option<Self> {
         match token_kind {
-            TokenKind::Plus | TokenKind::Minus => Self::Additive,
-            TokenKind::Multiply | TokenKind::Divide => Self::Multiplicative,
-            TokenKind::LeftParenthesis => Self::Grouping,
-            _ => todo!("Implement precedence for {:?}", token_kind),
+            TokenKind::Plus | TokenKind::Minus => Some(Self::Additive),
+            TokenKind::Multiply | TokenKind::Divide => Some(Self::Multiplicative),
+            TokenKind::LeftParenthesis => Some(Self::Grouping),
+            _ => None,
         }
     }
 }

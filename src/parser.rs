@@ -1,10 +1,16 @@
+pub mod expressions;
 pub mod precedence_table;
+pub mod statements;
+pub mod types;
 
 use std::{collections::HashMap, mem};
 
 use crate::{
-    ast::{Expr, Expression, Statement, Stmt, ZastProgram},
-    error_handler::{ZastErrorCollector, zast_errors::ZastError},
+    ast::{Expression, Statement, ZastProgram},
+    error_handler::{
+        ZastErrorCollector,
+        zast_errors::{Expected, ZastError},
+    },
     lexer::tokens::{Token, TokenKind},
     parser::precedence_table::Precedence,
 };
@@ -36,6 +42,19 @@ impl ZastParser {
         };
 
         parser.register_nud(TokenKind::Integer, ZastParser::parse_integer_literal);
+        parser.register_nud(TokenKind::Float, ZastParser::parse_float_literal);
+        parser.register_nud(
+            TokenKind::LeftParenthesis,
+            ZastParser::parse_grouping_expression,
+        );
+
+        parser.register_led(TokenKind::Plus, ZastParser::parse_binary_expr);
+        parser.register_led(TokenKind::Minus, ZastParser::parse_binary_expr);
+        parser.register_led(TokenKind::Divide, ZastParser::parse_binary_expr);
+        parser.register_led(TokenKind::Multiply, ZastParser::parse_binary_expr);
+
+        parser.register_stmt(TokenKind::Let, ZastParser::parse_variable_declaration);
+        parser.register_stmt(TokenKind::Const, ZastParser::parse_variable_declaration);
         parser
     }
 
@@ -56,9 +75,9 @@ impl ZastParser {
 
             if node.is_none() {
                 self.sync_tokens();
+            } else {
+                body.push(node.unwrap());
             }
-
-            body.push(node.unwrap());
         }
 
         if self.errors.has_errors() {
@@ -72,113 +91,112 @@ impl ZastParser {
         ZastProgram { body }
     }
 
-    fn throw_error(&mut self, err: ZastError) {
+    pub(crate) fn throw_error(&mut self, err: ZastError) {
         self.errors.add_error(err);
     }
 
     fn sync_tokens(&mut self) {
-        while self.current_token_kind().is_delimiter() {
-            self.advance();
-        }
+        let mut depth = 0;
 
-        self.advance(); // Advance past the delimiter
+        while !self.is_at_eof() {
+            match self.current_token_kind() {
+                TokenKind::LeftParenthesis => {
+                    depth += 1;
+                    self.advance();
+                }
+
+                TokenKind::RightParenthesis => {
+                    if depth == 0 {
+                        self.advance();
+                        return;
+                    }
+                    depth -= 1;
+                    self.advance();
+                }
+
+                TokenKind::Semicolon => {
+                    self.advance();
+                    if depth == 0 {
+                        return;
+                    }
+                }
+
+                TokenKind::Eof => return,
+
+                _ => {
+                    self.advance();
+                }
+            }
+        }
     }
 
-    fn current_token(&self) -> &Token {
+    pub(crate) fn current_token(&self) -> &Token {
         &self.tokens[self.current_token_ptr]
     }
 
-    fn peek_token(&self) -> &Token {
-        &self.tokens[self.current_token_ptr + 1]
+    pub(crate) fn peek_token(&self) -> &Token {
+        self.peek_at(1)
     }
 
-    fn peek_token_kind(&self) -> TokenKind {
+    pub(crate) fn peek_at(&self, n: usize) -> &Token {
+        if self.current_token_ptr + n >= self.tokens.len() {
+            return &self.tokens[self.current_token_ptr];
+        }
+        &self.tokens[self.current_token_ptr + n]
+    }
+
+    pub(crate) fn peek_token_kind(&self) -> TokenKind {
         self.peek_token().kind
     }
 
-    fn current_token_kind(&self) -> TokenKind {
+    pub(crate) fn current_token_kind(&self) -> TokenKind {
         self.current_token().kind
     }
 
-    fn current_token_precedence(&self) -> u8 {
-        Precedence::get_precedence(self.current_token_kind()).into()
+    pub(crate) fn current_token_precedence(&self) -> u8 {
+        Precedence::get_precedence(self.current_token_kind())
+            .map(|p| p.into())
+            .unwrap_or(0)
     }
 
-    fn next_token_precedence(&self) -> u8 {
-        Precedence::get_precedence(self.peek_token_kind()).into()
-    }
-
-    fn advance(&mut self) {
-        self.current_token_ptr += 1;
+    pub(crate) fn advance(&mut self) {
+        if self.current_token_ptr + 1 < self.tokens.len() {
+            self.current_token_ptr += 1;
+        }
     }
 
     fn is_at_eof(&self) -> bool {
         self.current_token_kind() == TokenKind::Eof
     }
 
-    fn expect(&mut self, expected_kind: TokenKind) -> bool {
-        let tok_kind = self.current_token_kind();
-        if tok_kind == expected_kind {
+    pub(crate) fn expect(&mut self, expected: Vec<Expected>) -> bool {
+        if self.check(expected) {
             self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn check(&mut self, expected: Vec<Expected>) -> bool {
+        let tok = self.current_token();
+        let tok_kind = self.current_token_kind();
+
+        let matches = expected.iter().any(|e| match e {
+            Expected::Token(kind) => tok_kind == *kind,
+            Expected::Concept(_) => false,
+        });
+
+        if matches {
             return true;
         }
 
-        false
-    }
-    // ---------- Statements ----------
-    pub fn try_parse_stmt(&mut self) -> Option<Statement> {
-        if let Some(stmt_fn) = self.stmt_lookup.get(&self.current_token_kind()) {
-            return stmt_fn(self);
-        }
-
-        let stmt_expr = self.try_parse_expr(Precedence::Default)?;
-        let stmt_expr_span = stmt_expr.span;
-        let stmt = Stmt::Expression {
-            expression: stmt_expr,
-        };
-
-        Some(stmt.spanned(stmt_expr_span))
-    }
-    // ---------- Expressions ----------
-    pub fn try_parse_expr(&mut self, precedence: Precedence) -> Option<Expression> {
-        let current_tok = self.current_token();
-        let prec: u8 = precedence.into();
-
-        let nud_fn = self.nud_lookup.get(&current_tok.kind).cloned();
-
-        if let Some(left_fn) = nud_fn {
-            let mut left = left_fn(self)?;
-
-            while !self.is_at_eof() {
-                let next_prec = self.current_token_precedence();
-                if prec >= next_prec {
-                    break;
-                }
-
-                let led_fn = self.led_lookup.get(&self.current_token_kind());
-                if let Some(right_fn) = led_fn {
-                    left = right_fn(self, left)?;
-                } else {
-                    break;
-                }
-            }
-
-            return Some(left);
-        }
-
-        self.throw_error(ZastError::UnexpectedToken {
-            span: current_tok.span,
-            token_kind: current_tok.kind,
+        self.errors.add_error(ZastError::ExpectedToken {
+            span: tok.span,
+            expected_tokens: expected,
+            found_token: tok_kind,
         });
-        None
-    }
 
-    pub fn parse_integer_literal(&mut self) -> Option<Expression> {
-        let current_tok_span = self.current_token().span;
-        let current_tok_literal = self.current_token().literal.clone();
-        let expr = Expr::IntegerLiteral(current_tok_literal.get_int().unwrap());
-
-        self.advance();
-        Some(expr.spanned(current_tok_span))
+        false
     }
 }
