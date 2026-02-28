@@ -57,11 +57,23 @@ pub enum TokenKind {
     /// `/`
     Divide,
 
+    /// `&`
+    Ampersand,
+
     /// `(`
     LeftParenthesis,
 
     /// `)`
     RightParenthesis,
+
+    /// `{`
+    LeftBrace,
+
+    /// `}`
+    RightBrace,
+
+    /// 'fn' keyword - used for declaring a function
+    Fn,
 
     /// `let` keyword — introduces a mutable variable declaration.
     Let,
@@ -196,6 +208,7 @@ impl Token {
         let token_kind = match keyword {
             "let" => TokenKind::Let,
             "const" => TokenKind::Const,
+            "fn" => TokenKind::Fn,
             _ => TokenKind::Identifier,
         };
 

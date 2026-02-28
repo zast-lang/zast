@@ -2,8 +2,7 @@ use zast::{lexer::ZastLexer, parser::ZastParser};
 
 fn main() {
     let src = r#"
-    const x: u8 = 5;
-    let x: u8 = 5;
+    fn main(a: **i32, b: i32,): void {}
 "#;
     let mut lexer = ZastLexer::new(src);
     match lexer.tokenize() {

@@ -1,8 +1,17 @@
-use crate::lexer::tokens::{Span, TokenKind};
+use crate::{
+    lexer::tokens::{Span, TokenKind},
+    types::{annotated_type::AnnotatedType, return_type::ReturnType},
+};
 
 #[derive(Debug)]
 pub struct ZastProgram {
     pub body: Vec<Statement>,
+}
+
+#[derive(Debug)]
+pub struct FunctionParameter {
+    pub name: String,
+    pub annotated_type: AnnotatedType,
 }
 
 pub type Expression = Spanned<Expr>;
@@ -11,6 +20,8 @@ pub enum Expr {
     IntegerLiteral(i64),
     FloatLiteral(f64),
     Identifier(String),
+    Address(Box<Expression>),
+    Dereference(Box<Expression>),
     BinaryExpression {
         left: Box<Expression>,
         operator: TokenKind,
@@ -21,13 +32,22 @@ pub enum Expr {
 pub type Statement = Spanned<Stmt>;
 #[derive(Debug)]
 pub enum Stmt {
+    FunctionDeclaration {
+        name: String,
+        parameters: Vec<FunctionParameter>,
+        return_type: ReturnType,
+        body: Box<Statement>, // Block Statement
+    },
+    BlockStatement {
+        statements: Vec<Box<Statement>>,
+    },
     Expression {
         expression: Expression,
     },
     VariableDeclaration {
         mutable: bool,
         identifier: String,
-        annotated_type: Expression,
+        annotated_type: AnnotatedType,
         value: Expression,
     },
 }

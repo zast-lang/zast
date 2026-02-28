@@ -139,14 +139,18 @@ impl ZastLexer {
         let tok = match cur {
             ';' => self.new_token(TokenKind::Semicolon, strc),
             ':' => self.new_token(TokenKind::Colon, strc),
+            '&' => self.new_token(TokenKind::Ampersand, strc),
             '=' => self.new_token(TokenKind::Assignment, strc),
             '.' => self.new_token(TokenKind::Dot, strc),
+            ',' => self.new_token(TokenKind::Comma, strc),
             '+' => self.new_token(TokenKind::Plus, strc),
             '-' => self.new_token(TokenKind::Minus, strc),
             '*' => self.new_token(TokenKind::Multiply, strc),
             '/' => self.new_token(TokenKind::Divide, strc),
             '(' => self.new_token(TokenKind::LeftParenthesis, strc),
             ')' => self.new_token(TokenKind::RightParenthesis, strc),
+            '{' => self.new_token(TokenKind::LeftBrace, strc),
+            '}' => self.new_token(TokenKind::RightBrace, strc),
             _ => {
                 self.throw_error(ZastError::IllegalToken {
                     span: self.get_span(
