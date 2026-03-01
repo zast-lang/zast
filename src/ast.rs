@@ -12,6 +12,7 @@ pub struct ZastProgram {
 pub struct FunctionParameter {
     pub name: String,
     pub annotated_type: AnnotatedType,
+    pub span: Span,
 }
 
 pub type Expression = Spanned<Expr>;

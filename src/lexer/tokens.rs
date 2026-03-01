@@ -260,3 +260,24 @@ pub struct Span {
     /// 1-based line number of the last character of the token.
     pub ln_end: usize,
 }
+
+impl Span {
+    pub fn format_span(span: Span) -> String {
+        let col: String;
+        let ln: String;
+
+        if span.ln_start == span.ln_end {
+            ln = format!("{}", span.ln_start);
+        } else {
+            ln = format!("{}-{}", span.ln_start, span.ln_end);
+        }
+
+        if span.col_start == span.col_end {
+            col = format!("{}", span.col_start);
+        } else {
+            col = format!("{}-{}", span.col_start, span.col_end);
+        }
+
+        format!("{}:{}", col, ln)
+    }
+}

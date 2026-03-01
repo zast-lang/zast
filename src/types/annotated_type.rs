@@ -1,6 +1,6 @@
 use crate::types::FloatWidth;
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum AnnotatedType {
     Primitive(String),
     Pointer(Box<AnnotatedType>),
@@ -30,6 +30,18 @@ impl AnnotatedType {
             Self::Primitive(t) => {
                 t.starts_with("f") && t[1..].parse::<u16>().map(|n| n >= 1).unwrap_or(false)
             }
+            _ => false,
+        }
+    }
+    pub fn is_bool(&self) -> bool {
+        match self {
+            Self::Primitive(t) => t == "bool",
+            _ => false,
+        }
+    }
+    pub fn is_string(&self) -> bool {
+        match self {
+            Self::Primitive(t) => t == "str",
             _ => false,
         }
     }

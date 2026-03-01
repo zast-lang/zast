@@ -1,4 +1,4 @@
-use crate::error_handler::zast_errors::ZastError;
+use crate::{ast::Spanned, error_handler::zast_errors::ZastError, lexer::tokens::Span};
 
 impl ZastError {
     pub fn get_error_msg(&self) -> String {
@@ -29,6 +29,29 @@ impl ZastError {
             }
             Self::IllegalToken { token_lexeme, .. } => {
                 format!("Illegal token found '{}'", token_lexeme)
+            }
+
+            Self::VariableRedeclaration {
+                variable_name,
+                original_span,
+                ..
+            } => {
+                format!(
+                    "Variable '{}' redeclared at '{}'",
+                    variable_name,
+                    Span::format_span(*original_span)
+                )
+            }
+            Self::FunctionRedeclaration {
+                fn_name,
+                original_span,
+                ..
+            } => {
+                format!(
+                    "Function '{}' redeclared at '{}'",
+                    fn_name,
+                    Span::format_span(*original_span)
+                )
             }
         }
     }

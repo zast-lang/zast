@@ -2,7 +2,9 @@ use core::fmt;
 
 use crate::lexer::tokens::{Span, TokenKind};
 
+#[derive(Debug)]
 pub enum ZastError {
+    // Parsing
     UnexpectedToken {
         span: Span,
         token_kind: TokenKind,
@@ -15,6 +17,18 @@ pub enum ZastError {
     IllegalToken {
         span: Span,
         token_lexeme: String,
+    },
+
+    // Sema
+    VariableRedeclaration {
+        span: Span,
+        variable_name: String,
+        original_span: Span,
+    },
+    FunctionRedeclaration {
+        span: Span,
+        fn_name: String,
+        original_span: Span,
     },
 }
 

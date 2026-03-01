@@ -126,6 +126,7 @@ impl ZastParser {
             return None;
         }
 
+        let name_span = self.current_token().span;
         let name = self.current_token().literal.get_identifier()?;
         self.advance();
 
@@ -134,10 +135,19 @@ impl ZastParser {
         }
 
         let annotated_type = self.try_parse_value_type()?;
+        let type_span = self.current_token().span;
+
+        let span = Span {
+            ln_start: name_span.ln_start,
+            ln_end: type_span.ln_end,
+            col_start: name_span.col_start,
+            col_end: type_span.col_end,
+        };
 
         Some(FunctionParameter {
             name,
             annotated_type,
+            span,
         })
     }
 
